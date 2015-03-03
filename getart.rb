@@ -20,7 +20,7 @@ class GetArt
        :regexp => /sciencedirect\.com/,
        :banner => "SCIENCE DIRECT",
        :fetch => lambda do |mech, url|
-         mech.get(url).link_with(:text => "Download PDF").click.body
+         mech.get(url).link_with(:id => "pdfLink").click.body
        end,
        :transform => lambda do |journal|
          journal.gsub(/ScienceDirect Publication: */, "")
@@ -90,7 +90,10 @@ class GetArt
        :regexp => /sagepub\.com/,
        :banner => "SAGE",
        :fetch => lambda do |mech, url|
-         mech.get(url).link_with(:text => "Full Text (PDF)").click.frame_with(:name => "ContentsPage").content.body
+         page = mech.get(url)
+         link = page.link_with(:text => "Full Text (PDF)")
+         page = link.click if link
+         page.frame_with(:name => "ContentsPage").content.body
        end,
        :transform => lambda do |journal|
          journal.gsub(/ current isue$/, "")
