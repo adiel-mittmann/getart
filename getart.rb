@@ -133,7 +133,7 @@ class GetArt
        :regexp => /feedburner\.com\/pnas\//,
        :banner => "PNAS",
        :fetch => lambda do |mech, url|
-         mech.get(url).link_with(:text => "Full Text (PDF)").click.frame_with(:name => "ContentsPage").content.body
+         mech.get(url).link_with(:text => "Full Text (PDF)").click.body
        end,
        :transform => lambda do |journal|
          "PNAS"
