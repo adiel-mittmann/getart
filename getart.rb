@@ -139,6 +139,16 @@ class GetArt
          "PNAS"
        end,
      },
+     {
+       :regexp => /feeds\.nature\.com/,
+       :banner => "NATURE",
+       :fetch => lambda do |mech, url|
+         mech.get(url).link_with(:href => /\.pdf$/).click.body
+       end,
+       :transform => lambda do |journal|
+         "Nature"
+       end,
+     },
     ]
 
   def run(cache_db_path, article_dir, socks_host = nil, socks_port = nil)
