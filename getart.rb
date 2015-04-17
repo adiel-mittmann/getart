@@ -149,6 +149,16 @@ class GetArt
          "Nature"
        end,
      },
+     {
+       :regexp => /sciencemag\.org/,
+       :banner => "SCIENCE",
+       :fetch => lambda do |mech, url|
+         mech.get(url).link_with(:text => "Full Text (PDF)").click.body
+       end,
+       :transform => lambda do |journal|
+         "Science"
+       end,
+     },
     ]
 
   def run(cache_db_path, article_dir, socks_host = nil, socks_port = nil)
