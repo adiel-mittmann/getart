@@ -26,3 +26,5 @@ It currently handles:
 * PLOS
 * Liebert
 * PNAS
+* Nature
+* Science
