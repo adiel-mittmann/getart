@@ -1,6 +1,7 @@
 require 'sqlite3'
 require 'mechanize'
 require 'socksify/http'
+require 'json'
 
 class GetArt
 
@@ -10,7 +11,12 @@ class GetArt
        :regexp => /ieeexplore\.ieee\.org/,
        :banner => "IEEE",
        :fetch => lambda do |mech, url|
-         mech.get(url).link_with(:id => "full-text-pdf").click.frame_with(:src => /pdf/).content.body
+         page = mech.get(url)
+         metadata = page.body.lines.reject{|x| x !~ /global\.document\.metadata/}.first.gsub(/ *global\.document\.metadata=/, "").gsub(/;$/, "")
+         metadata = JSON.parse(metadata)
+         url = metadata["pdfUrl"]
+         page = mech.get(url)
+         page.frame_with(:src => /pdf/).content.body
        end,
        :transform => lambda do |journal|
          journal.gsub(/, IEEE -.*/, "").gsub(/ - new TOC/, "").strip
@@ -30,7 +36,12 @@ class GetArt
        :regexp => /link\.springer\.com/,
        :banner => "SPRINGER",
        :fetch => lambda do |mech, url|
-         mech.get(url).link_with(:id => "action-bar-download-article-pdf-link").click.body
+         page = mech.get(url)
+         link = page.link_with(:id => "action-bar-download-article-pdf-link")
+         if link == nil
+           link = page.link_with(:href => /\.pdf$/)
+         end
+         link.click.body
        end,
        :transform => lambda do |journal|
          journal.gsub(/Latest Results for /, "")
@@ -40,7 +51,9 @@ class GetArt
        :regexp => /wiley\.com/,
        :banner => "WILEY",
        :fetch => lambda do |mech, url|
-         mech.get(url).link_with(:id => "journalToolsPdfLink").click.body
+         y = mech.get(url).uri.to_s.gsub(/abstract;.*/, "pdf")
+         x = mech.get(y).body
+         x
        end,
        :transform => lambda do |journal|
          journal
@@ -159,6 +172,31 @@ class GetArt
          "Science"
        end,
      },
+     {
+       :regexp => /oxfordjournals\.org/,
+       :banner => "OXFORD",
+       :fetch => lambda do |mech, url|
+         mech.get(url).link_with(:href => /full-text\.pdf$/).click.body
+       end,
+       :transform => lambda do |journal|
+         journal
+       end,
+     },
+     {
+       :regexp => /arxiv\.org/,
+       :banner => "ARXIV",
+       :fetch => lambda do |mech, url|
+         link = mech.get(url).link_with(:href => /\/pdf\//)
+         if link == nil
+           puts "There will be an error, probably because the submission was withdrawn from ARXIV"
+           puts url
+         end
+         link.click.body
+       end,
+       :transform => lambda do |journal|
+         journal
+       end,
+     },
     ]
 
   def run(cache_db_path, article_dir, socks_host = nil, socks_port = nil)
@@ -213,7 +251,7 @@ class GetArt
 SELECT rss_item.id, rss_item.url, rss_item.feedurl, rss_item.title, rss_feed.title
 FROM rss_item
 JOIN rss_feed ON rss_item.feedurl = rss_feed.rssurl
-WHERE unread = 1 AND deleted = 0}
+WHERE rss_item.flags = "e"}
 
     @db.execute(sql).each do |row|
 
@@ -235,6 +273,9 @@ WHERE unread = 1 AND deleted = 0}
             else
               raise
             end
+          rescue NoMethodError
+            print " SOMETHING WRONG:"
+            print $!
           end
           store_pdf id, journal, title, pdf if pdf
           puts
@@ -276,6 +317,7 @@ WHERE unread = 1 AND deleted = 0}
     journal   = journal  .gsub(/\//, "-")
 
     name = "#{journal}: #{title}"
+    name = name[0..60] # TODO
     io = nil
     while io == nil
       begin
@@ -286,7 +328,7 @@ WHERE unread = 1 AND deleted = 0}
     end
     io.write pdf
     io.close
-    @db.execute("UPDATE rss_item SET unread = 0 WHERE id = #{id}")
+    @db.execute("UPDATE rss_item SET flags = NULL, unread = 0 WHERE id = #{id}")
     print " #{journal}: #{title}"
   end
 
